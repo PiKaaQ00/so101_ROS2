@@ -1,0 +1,21 @@
+/**:
+  ros__parameters:
+    port: "/dev/ttyACM0"
+    baudrate: 1000000
+    read_rate: 5.0
+    present_position_address: 56
+    position_ticks_per_turn: 4096.0
+    response_timeout: 0.2
+    joint_names:
+      - shoulder_pan
+      - shoulder_lift
+      - elbow_flex
+      - wrist_flex
+      - wrist_roll
+      - gripper
+    motor_ids: [1, 2, 3, 4, 5, 6]
+    homing_offsets: [-1862, 1289, 1062, 1943, 888, 1881]
+    range_mins: [851, 811, 887, 987, 0, 2025]
+    range_maxs: [3438, 3215, 3090, 3219, 4095, 3493]
+    signs: [1, 1, 1, 1, 1, 1]
+    zero_positions: [2076, 1957, 2056, 2241, 1920, 2050]
