@@ -1,490 +1,349 @@
 <div align="center">
   <h1>so101_ros2</h1>
-  <p>ROS2 integration for the Lerobot SO101 manipulator.</p>
+  <p>SO101 follower arm ROS2 read-only integration without lerobot.</p>
   <p>
-    <a href="docs/index.rst"><img src="https://img.shields.io/badge/docs-latest-blue?logo=readthedocs" alt="Documentation"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
     <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python Version"></a>
-    <a href="https://docs.ros.org/en/humble/Installation.html"><img src="https://img.shields.io/badge/ROS2-Humble-green.svg"     alt="ROS2 Version"></a>
-    <a href="https://huggingface.co/docs/lerobot/"><img src="https://img.shields.io/badge/Lerobot-orange.svg" alt="Lerobot"></a>
-    <a href="https://developer.nvidia.com/isaac-sim"><img src="https://img.shields.io/badge/Isaac--Sim-orange.svg" alt="IsaacSim"></a>
+    <a href="https://docs.ros.org/en/humble/Installation.html"><img src="https://img.shields.io/badge/ROS2-Humble-green.svg" alt="ROS2 Version"></a>
   </p>
-  <p><a href="https://so101-ros2.readthedocs.io/">See the full documentation for more information!</a></p>
 </div>
 
 ---
 
-## Overview
+## 项目状态
 
-This workspace contains several packages that provide description files, controllers and ROS2 integrations for the SO101 arm. The current focus is on the Lerobot ↔ ROS2 bridge, teleoperation workflows and recording datasets for imitation learning. MoveIt motion planning and Gazebo simulation support are a work in progress, while Isaac Sim integration is already available for teleoperating the leader/follower arms and streaming observations for data collection.
+本仓库当前用于标准 SO101 从臂的 ROS2 只读连接测试。
 
----
+已经完成：
 
-## Dependencies
+```text
+不依赖 lerobot
+直接连接 SO101 从臂 Feetech STS3215 舵机
+检测 1-6 号舵机是否在线
+读取每个舵机当前位置
+发布 ROS2 joint_states
+在 RViz 中显示机械臂模型
+支持零位和方向配置
+中文测试日志
+```
 
-- ROS2 Humble from the [Official Link](https://docs.ros.org/en/humble/Installation.html)
-- (Optional) Isaac Sim ≥ 5.0 following the [IsaacSim official repo](https://github.com/isaac-sim/IsaacSim?tab=readme-ov-file#quick-start)
-
----
-
-## Installation
-
-### Setup lerobot
-
-These docs assume that your SO101 is already assembled and all motor IDs and baud rates are set.
-
-#### Lerobot ROS2 Python Env Setup
-
-1. Create and activate a Conda environment
-
-    ```bash
-    conda create -n lerobot_ros2 python=3.10
-    conda activate lerobot_ros2
-    ```
-
-    **[NOTE]:** To avoid "libstdc++.so.6: version GLIBCXX_3.4.30' not found (required by /opt/ros/humble/lib/librosbag2_compression.so)" error update conda’s C++ runtime:
-
-  ```bash
-    conda install -n lerobot_ros2 -c conda-forge "libstdcxx-ng>=12" "libgcc-ng>=12"
-  ```
-
-
-2. Clone and install the forked Lerobot repository
-
-    ```bash
-    git clone https://github.com/nimiCurtis/lerobot.git
-    cd lerobot
-    pip install -e ".[all]"
-    ```
-
-3. Verify robot connections
-
-    After connecting the robots via USB, detect their ports:
-
-    ```bash
-    lerobot-find-port
-    ```
-
-4. Grant access to USB ports (for robot communication)
-
-    Add your user to the dialout group (recommended):
-
-    ```bash
-    sudo usermod -aG dialout $USER
-    ```
-
-    Then log out and log back in for the changes to take effect.
-
-    Alternatively, you can manually change permissions:
-
-    ```bash
-    sudo chmod 666 /dev/<leader port>
-    sudo chmod 666 /dev/<follower port>
-    ```
-
-#### Calibrate
-
-Check out [this link](https://huggingface.co/docs/lerobot/so101?calibrate_follower=Command#calibrate) and calibrate your leader/follower arms correctly. Finally save the calibration files in a known directoy.
-
-#### Validate installation and calibration
-
-Try this tutorial from the [official link](https://huggingface.co/docs/lerobot/il_robots) to check env and robots are configured correctly.
-
-#### (Optional) Lerobot IsaacLab Python Env Setup
-
-1. Follow the instructions of the [this link](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/source_installation.html) to install IsaacSim 5.0 and the most updated IsaacLab.
-
-    **[NOTE]**: Install **IsaacLab** in a **separate conda environment** from the one used for `lerobot_ros2`.
-    This separation is required because **IsaacLab uses Python 3.11**, while **ROS2 Humble and `lerobot_ros2` use Python 3.10**. Keeping them in distinct environments ensures compatibility while allowing dependency synchronization with `lerobot`.
-
-
-2. Activate the environment:
-
-    ```bash
-    conda activate lerobot_isaaclab
-    ```
-
-3. Then from the lerobot directory, install the extras required for the IsaacLab
-   utilities, adjust the extras list to match the features you use, for example:
-
-    ```bash
-    pip install -e ".[<your extras here>]" # e.g. ".[all] or ".[feetech,smolvla,pi,async]" etc.
-    ```
-
-### Build so101_ros2
-
-Once you can teleoperate so101 leader-follower properly with lerobot API it is time to bridge to ros2 workspace.
-
-1. **Create the workspace and clone the repository:**
-
-    ```bash
-    mkdir -p ~/ros2_ws/src
-    cd ~/ros2_ws/src
-    git clone --recurse-submodules https://github.com/nimiCurtis/so101_ros2.git
-    cd so101_ros2
-    ```
-
-2. **Initial workspace bootstrap (run once):** Execute [`build.sh`](build.sh) to install dependencies and prepare your shell environment.
-
-    ```bash
-    ./build.sh
-    ```
-
-    The script can be invoked again safely, but it is intended for the first-time initialisation of the project. After that, regular development workflows only need incremental `colcon build` invocations inside `~/ros2_ws`. It appends the ROS2 Humble environment, `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp` and the workspace overlay sourcing statements to your `~/.bashrc` so new shells are ready to use.
-
-3. Because lerebot env is managed by conda package manager, a workaround to compile the ros2 workspace and utilize the lerobot virtual env is to export the required variables in your shell initialisation file:
-
-    ```bash
-    echo export LECONDA_SITE_PACKAGES="<your path to anaconda/miniconda installation/envs/lerobot_ros2/lib/python3.10/site-packages" >> ~/.bashrc
-    echo export LEROBOT_SRC="<your path to lerobot pkg>/src/lerobot" >> ~/.bashrc
-    echo export SO101BRIDGE_INSTALL_SITE_PACKAGES="<your path to ros2_ws>/install/so101_ros2_bridge/lib/python3.10/site-packages/lerobot" >> ~/.bashrc
-    source ~/.bashrc
-    ```
-
-    Then create a symbolic link to lerobot package inside the ros2 workspace install site-packages:
-
-    ```bash
-    ln -s $LEROBOT_SRC $SO101BRIDGE_INSTALL_SITE_PACKAGES
-    ```
-
-**3. Known Issues**
-
-  * **Potential NumPy Version Error:** You may encounter an error related to NumPy version of the default python environment. To fix this, please upgrade with the following command:
-    ```bash
-    pip install --upgrade numpy
-    ```
-
-### Cameras
-
-This package supports the following camera types:
-
-1. **V4L USB Cameras**
-   The ROS wrapper for USB cameras should be installed automatically using `rosdep` when building the package.
-   If not, install it manually with:
-
-   ```bash
-   sudo apt install ros-humble-usb-cam
-   ```
-
-2. **Intel® RealSense™ Cameras**
-   Install the latest Intel® RealSense™ SDK 2.0 by following the *"Installing the packages"* section in the [librealsense documentation](https://github.com/IntelRealSense/librealsense/blob/master/doc/distribution_linux.md#installing-the-packages).
-   The ROS wrapper for RealSense cameras should also be installed automatically via `rosdep`.
-   If not, install it manually with:
-
-   ```bash
-   sudo apt install ros-humble-realsense2-*
-   ```
+当前节点是低风险只读测试节点，不会向机械臂发送运动命令。
 
 ---
 
-## Getting Started
+## 已完成的功能
 
-### Configure bridge parameters
+### 1. 不依赖 lerobot
 
-Edit `so101_ros2_bridge/config/so101_leader_params.yaml` and `so101_ros2_bridge/config/so101_follower_params.yaml` so they reference the correct USB ports, calibration directory and Lerobot identifiers:
+新增节点直接通过串口与 SO101 从臂舵机通信，不需要安装或导入 `lerobot`。
+
+节点文件：
+
+```text
+so101_ros2_bridge/so101_ros2_bridge/direct_follower_readonly_node.py
+```
+
+### 2. ROS2 关节状态发布
+
+节点会发布：
+
+```text
+/follower/joint_states
+/follower/joint_states_raw
+```
+
+查看一次关节状态：
+
+```bash
+ros2 topic echo /follower/joint_states --once
+```
+
+连续查看：
+
+```bash
+ros2 topic echo /follower/joint_states
+```
+
+### 3. RViz 模型显示
+
+启动只读测试时可以打开 RViz。RViz 中的 SO101 模型会根据 `/follower/joint_states` 更新姿态。
+
+---
+
+## 当前不会做的事情
+
+当前版本不会控制机械臂运动。
+
+不会执行：
+
+```text
+不发送舵机目标位置
+不订阅 /follower/joint_commands
+不启动 arm_controller
+不启动 gripper_controller
+不执行轨迹控制
+不执行遥操作
+```
+
+---
+
+## 主要新增文件
+
+只读测试节点：
+
+```text
+so101_ros2_bridge/so101_ros2_bridge/direct_follower_readonly_node.py
+```
+
+只读测试配置：
+
+```text
+so101_ros2_bridge/config/so101_direct_follower_readonly.yaml
+```
+
+只读测试启动文件：
+
+```text
+so101_bringup/launch/so101_readonly_test.launch.py
+```
+
+Python 入口已添加到：
+
+```text
+so101_ros2_bridge/setup.py
+```
+
+依赖声明已添加到：
+
+```text
+so101_ros2_bridge/package.xml
+```
+
+---
+
+## 依赖
+
+需要 ROS2 Humble。
+
+需要串口 Python 包：
+
+```bash
+sudo apt install python3-serial
+```
+
+---
+
+## 编译
+
+在 ROS2 工作空间根目录执行：
+
+```bash
+cd ~/so_101_ros2_ws
+colcon build --symlink-install
+source install/setup.bash
+```
+
+---
+
+## 启动只读连接测试
+
+不启动 RViz：
+
+```bash
+ros2 launch so101_bringup so101_readonly_test.launch.py port:=/dev/ttyACM0 display:=false
+```
+
+启动 RViz：
+
+```bash
+ros2 launch so101_bringup so101_readonly_test.launch.py port:=/dev/ttyACM0 display:=true
+```
+
+根据实际情况修改串口：
+
+```text
+/dev/ttyACM0
+/dev/ttyACM1
+```
+
+正常连接时会看到类似日志：
+
+```text
+准备打开从臂串口：/dev/ttyACM0，波特率：1000000。
+串口已打开，开始检测 1-6 号舵机。
+shoulder_pan：检测到 1 号舵机。
+shoulder_lift：检测到 2 号舵机。
+elbow_flex：检测到 3 号舵机。
+wrist_flex：检测到 4 号舵机。
+wrist_roll：检测到 5 号舵机。
+gripper：检测到 6 号舵机。
+所有舵机均已响应。
+只读连接测试节点已启动。该节点不会发送运动目标。
+```
+
+---
+
+## 零位和方向配置
+
+配置文件：
+
+```text
+so101_ros2_bridge/config/so101_direct_follower_readonly.yaml
+```
+
+核心参数：
 
 ```yaml
-so101_follower_ros2_bridge:
-  ros__parameters:
-    port: <your follower robot USB port>
-    id: <your follower robot ID>
-    calibration_dir: "/abs/path/to/calibration" # Optional. If omitted, falls back to config/calibration/
-    use_degrees: true
-    max_relative_target: 10
-    disable_torque_on_disconnect: true
-    publish_rate: 30.0
+signs: [1, 1, 1, 1, 1, 1]
+zero_positions: [2076, 1957, 2056, 2241, 1920, 2050]
 ```
 
-### Configure Cameras
+关节顺序：
 
-There are 2 configuration files for the cameras, one is ```so101_bringup/config/so101_cameras.yaml``` which includes the list of cameras to launch, their names and links to their configuration files, and the other, on the same directory is ```so101_usb_camera.yaml``` / ```so101_realsense2.yaml``` which includes the parameters for the specific cameras.
-
-For example setting up a wrist USB camera on so101_bringup/config/so101_cameras.yaml, would look like this:
-```yaml
-cameras:
-
-  - name: cam_front # name of camera
-    camera_type: usb_camera # name of pkg # Currently supports 'usb_camera' and 'realsense2_camera'
-    param_path: so101_usb_cam.yaml # path to camera specific config file
-    namespace: follower # ns (info of cam location)
+```text
+shoulder_pan
+shoulder_lift
+elbow_flex
+wrist_flex
+wrist_roll
+gripper
 ```
 
-Then in so101_usb_camera.yaml you can set the parameters for that specific camera:
+`zero_positions` 表示 ROS 关节角为 0 时对应的舵机原始位置。
 
-```yaml
-# config/so101_usb_cam.yaml
+`signs` 表示方向：
 
-# 0) Shared defaults for all usb_cam nodes
-/**:
-  ros__parameters:
-    framerate: 30.0
-    io_method: "mmap"
-    pixel_format: "mjpeg2rgb"
-    av_device_format: "YUV422P"
-    image_width: 640
-    image_height: 480
-    # other shared parameters over all usb_cam nodes...
-
-# 1) node name should be fit the this format: <namespace>/<camera_name> from the so101_cameras.yaml
-/follower/cam_front:
-  ros__parameters:
-    video_device: "/dev/video0"
-    frame_id: "cam_front"
-    camera_name: "cam_front"
-    camera_info_url: "package://usb_cam/config/camera_info.yaml"
-
-```
-### Launch the robot with cameras
-To visualise the robot description with the camera pipelines enabled run:
-```bash
-ros2 launch so101_bringup so101_robot_with_cameras.launch.py display:=true
+```text
+1  表示同向
+-1 表示反向
 ```
 
-This brings up the SO101 description, controllers and USB/RealSense camera bridges while opening RViz (`display:=true`). You should manually manipulate your follower robot to some configuration, launch and see the robot model and cameras output matching your follower robot current status.
+换算公式：
 
-![SO101 with Cameras in RViz](media/images/getting_started.png)
-
-![SO101 with Cameras in RViz](media/images/getting_started2.jpeg)
+```text
+ros_angle = sign * (raw_position - zero_position) / 4096.0 * 2π
+```
 
 ---
 
-## Imitation Learning with so101_ros2
+## 修改零位
 
-This workspace connects the Lerobot leader/follower stack with ROS2 so you can teleoperate the hardware, stream observations into ROS tooling and record demonstrations for imitation learning pipelines.
+1. 将真实机械臂摆到参考姿态。
 
-### Prerequisites
-
-- USB ports for both leader and follower arms. Identify them with `lerobot-find-port` and update the bridge parameter files accordingly.
-- If you didn't complete calibration yet, run the [Lerobot SO101 calibration](https://huggingface.co/docs/lerobot/so101?calibrate_follower=Command#configure-the-motors) procedure for both arms and keep the exported JSON files. The bridge looks for them in `so101_ros2_bridge/config/calibration/` by default or alternatively provide an absolute path via the `calibration_dir` parameter.
-- Configure the camera parameters as described in the [Configure Cameras](#configure-cameras) section.
-
-
-### Run a real teleoperation session
-
-Launch the leader and follower bridges, cameras and RViz in one terminal:
+2. 启动只读测试：
 
 ```bash
-ros2 launch so101_bringup so101_teleoperate.launch.py mode:=real expert:=human display:=true
+ros2 launch so101_bringup so101_readonly_test.launch.py port:=/dev/ttyACM0 display:=false
 ```
 
-The launch file brings up the leader bridge immediately >> waits for the follower to connect >> optionally opens RViz (`display:=true`) >> starts the teleoperation componenet once both arms publish joint states.
+3. 查看日志中的舵机原始位置：
 
-Watch the log output for any connection errors—most issues stem from missing calibration files or incorrect USB port assignments.
+```text
+当前舵机原始位置：[2076, 816, 3086, 2893, 2083, 2050]
+```
 
-You should now be able to move the leader arm and see the follower mimicking its motions in real time and RViz which visualises the follower cameras and follower state comparing to the leader state.
+4. 如果希望当前真实姿态对应 RViz 的关节零位，直接写入：
 
+```yaml
+zero_positions: [2076, 816, 3086, 2893, 2083, 2050]
+```
 
-### Run an Isaac teleoperation session
+5. 如果希望当前真实姿态对应仓库默认折叠姿态，需要根据目标角度反算 `zero_positions`。
 
-1. Start IsaacSim in one terminal.
+默认折叠姿态文件：
 
-  ```bash
-  ${ISAACSIM_PATH}/isaac-sim.sh
-  ```
+```text
+so101_description/config/initial_positions.yaml
+```
 
-2. Load your ready-made usd file or use the provided example scene located at `so101_description/usd/so101_new_calib.usd`.
+默认角度：
 
-3. Launch in a second terminal the teleoperation pipeline connected to the Isaac transport topics:
+```yaml
+shoulder_pan: 0.0
+shoulder_lift: -1.75
+elbow_flex: 1.58
+wrist_flex: 1.0
+wrist_roll: 0.25
+gripper: 0.0
+```
 
-  ```bash
-  ros2 launch so101_bringup so101_teleoperate.launch.py mode:=isaac expert:=human display:=true
-  ```
+反算公式：
 
-4. Start simulation.
+```text
+zero_position = raw_position - target_angle / (2π) * 4096.0 / sign
+```
 
-This reuses the teleoperation pipeline while switching the interfaces to the Isaac transport topics so you can stream demonstrations from the leader arm directly into the simulator using Isaac ROS2 Bridge.
-
-You should now be able to move the leader arm and see the follower in IsaacSim mimicking its motions in real time and RViz which visualises the follower cameras and follower state comparing to the leader state.
-
-
-### Record demonstrations with `system_data_recorder`
-
-This package is compiled and included in the workspace as a submodule to facilitate recording demonstrations for imitation learning. It uses the
-[system_data_recorder](https://github.com/nimiCurtis/system_data_recorder) package to handle the recording process.
-
-
-1. Configure the topics you care about and some other recording parameters in
-   `so101_bringup/config/so101_sdr.yaml`.
-
-2. Start teleoperation (real|isaac) from another terminal.
-
-3. Launch the recorder lifecycle node:
-
-   ```bash
-   ros2 launch so101_bringup so101_record.launch.py
-   ```
-
-4. Configure and activate the node to begin recording:
-
-   ```bash
-   ros2 lifecycle set /sdr configure
-   ros2 lifecycle set /sdr activate
-   ```
-
-5. When you are done collecting a demonstration, stop the recording:
-
-   ```bash
-   ros2 lifecycle set /sdr deactivate
-   ros2 lifecycle set /sdr shutdown
-   ```
-
-
-#### Keyboard Commander Utility
-
-For better user control, an `SDRKeyboardCommander` node is available. This node listens for keyboard presses and sends the corresponding lifecycle transition requests to the `/sdr` node.
-
-
-##### Running
-
-1.  In one terminal, run your `sdr` node:
-
-    ```bash
-    ros2 launch so101_bringup so101_record.launch.py
-    ```
-
-2.  In a second terminal, run the commander:
-
-    ```bash
-    ros2 run system_data_recorder sdr_commander
-    ```
-
-##### Controls
-
-Once the commander node is running and connected to the `/sdr` services, you can use the following keys to control the recorder:
-
-| Key | Action | Lifecycle Transition |
-| :--- | :--- | :--- |
-| **c** | Configure | `CONFIGURE` |
-| **a** | Activate | `ACTIVATE` (Starts recording) |
-| **d** | Deactivate | `DEACTIVATE` (Pauses recording) |
-| **l** | Cleanup | `CLEANUP` |
-| **s** | Shutdown | `SHUTDOWN` |
-| **g** | Get State | (Queries and prints the current state) |
-| **h** | Help | (Prints the help menu) |
-| **q** | Quit | (Shuts down the commander node) |
-
-The resulting rosbag2 dataset is stored under the `copy_destination` directory
-with the prefix defined in `bag_name_prefix`. Inspect the bag with
-`ros2 bag info <bag_path>` or process it with your preferred imitation learning
-tooling. For more options see the
-[system_data_recorder documentation](https://github.com/nimiCurtis/system_data_recorder).
-
-
-### Convert rosbag2lerobot dataset
-
-#### Prerequisites
-
-- A recorded rosbag2 dataset using the `system_data_recorder` as described in the previous section.
-- Install the [so101_rosbag2lerobot_dataset](https://github.com/nimiCurtis/so101_rosbag2lerobot_dataset) package:
-
-    ```bash
-    conda activate lerobot_ros2
-    git clone https://github.com/nimiCurtis/so101_rosbag2lerobot_dataset.git
-    cd so101_rosbag2lerobot_dataset
-    pip install so101_rosbag2lerobot_dataset
-    ```
-
-#### Conversion
-Use the `so101-rosbag2lerobot` CLI tool to convert your rosbag2 dataset into the
-`lerobot` imitation learning dataset format.
-
-1. Create a config file with the conversion parameters. An example config is shown in the package config directory.
-
-2. Run the conversion command:
-
-   ```bash
-   so101-rosbag2lerobot --config <path_to_your_config.yaml>
-   ```
-
-3. The converted dataset will be saved in the specified output directory. Now you should be able to visualize and use it with the `lerobot` imitation learning framework.
-
-
-### Trianing a VLA
-
-Finetune a VLA model on the collected dataset using directly the `lerobot` package.
-Check out the official tutorials on [imitation learning with lerobot](https://huggingface.co/docs/lerobot/il_robots#train-a-policy).
-
-### Deploying a VLA
-
-Once you have a trained VLA checkpoint, you can deploy it in the teleoperation pipeline to control the follower arm autonomously.
-
-Supported policies:
-- smolvla
-- pi05 [in progress]
-
-#### Configuration
-
-1. Configure the policy parameters in `so101_ros2_bridge/config/so101_policy_params.yaml` to point to your trained checkpoint and specify the task description. Adjust other parameters as needed.
-
-2. Update the IO configuration in `so101_ros2_bridge/config/policies/io.yaml` to match your setup, including topics for observations and actions.
-
-3. Update specific policy parameters in `so101_ros2_bridge/config/policies/<policy_name>.yaml` if necessary.
-
-#### Policy Lifecycle Node
-
-The policy lifecycle node is responsible for managing the lifecycle of the policy. It handles transitions between different states (e.g., CONFIGURE, ACTIVATE, DEACTIVATE).
-
-Transitions:
-- **CONFIGURE**: Loads the policy model and prepares it for inference.
-- **ACTIVATE**: Starts the inference loop, allowing the policy to control the follower arm.
-- **DEACTIVATE**: Stops the inference loop, pausing policy control.
-- **CLEANUP**: Resets the node to an unconfigured state.
-- **SHUTDOWN**: Cleans up resources and prepares for shutdown.
-
-For example, to configure and activate the policy node, use the following commands:
+修改后重新编译并 source：
 
 ```bash
-ros2 lifecycle set /policy_runner configure
-ros2 lifecycle set /policy_runner activate
+cd ~/so_101_ros2_ws
+colcon build --symlink-install
+source install/setup.bash
 ```
 
-#### Run a real world inference session
+---
 
-Once configured, launch the teleoperation pipeline with policy expert:
+## 修改方向
+
+如果真实机械臂某个关节往一个方向动，但 RViz 中该关节往反方向动，修改对应的 `signs`。
+
+例如 `elbow_flex` 是第 3 个关节，如果它方向反了：
+
+```yaml
+signs: [1, 1, -1, 1, 1, 1]
+```
+
+---
+
+## 常见问题
+
+### RViz 模型在两个姿态之间快速切换
+
+通常是 `/follower/joint_states` 有多个发布者。
+
+检查：
 
 ```bash
-ros2 launch so101_bringup so101_teleoperate.launch.py mode:=real expert:=policy display:=true
+ros2 topic info /follower/joint_states -v
 ```
 
-The launch file will start follower bridge, cameras, policy lifecycle node and RViz (if `display:=true`). The policy node will wait until both leader and follower are publishing joint states before activating the inference loop.
+正常只读测试应为：
 
-In another terminal, configure and activate the policy node:
+```text
+Publisher count: 1
+```
+
+如果有多个发布者，清理旧进程：
 
 ```bash
-ros2 lifecycle set /policy_runner configure
-ros2 lifecycle set /policy_runner activate
+pkill -f direct_follower_readonly_node
+pkill -f robot_state_publisher
+pkill -f rviz2
 ```
 
-**[NOTE]:** Configure transition can take some time depending on the model size and hardware.
+然后重新启动。
 
-Then the follower arm should start moving according to the policy's predictions based on the observations and the specified task.
+### 串口打不开
 
-#### Run an Isaac inference session
-
-Launch the teleoperation pipeline with policy expert connected to Isaac transport topics:
+检查串口和权限：
 
 ```bash
-ros2 launch so101_bringup so101_teleoperate.launch.py mode:=isaac expert:=policy display:=true
+ls /dev/ttyACM*
+sudo chmod 666 /dev/ttyACM0
 ```
 
-Then in another terminal, configure and activate the policy node as already shown above.
+如果在虚拟机中使用真机，还需要确认 USB 已直通到虚拟机。
 
-Then the simulated follower arm in IsaacSim should start moving according to the policy's predictions based on the observations and the specified task.
+---
+
+## 后续计划
+
+当前只完成只读连接、状态发布和 RViz 显示。
+
+后续如果要实现运动控制，应先增加单关节、小角度、带限位检查的安全写入测试，再接入完整 ROS2 controller。
+
+---
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for the
-full license text.
-
----
-
-## Contributions
-
-Contributions are welcome. Check out the [CONTRIBUTING.md](CONTRIBUTING.md) file for guidelines on how to contribute.
-
----
-
-## Roadmap for v0.2.0
-- [ ] Moveit integration
-- [ ] Gazebo integration + teleop
-- [ ] IsaacLab
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for the full license text.
