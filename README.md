@@ -199,6 +199,22 @@ ros2 launch so101_moveit_config moveit_planning.launch.py \
 
 当前 IK 使用 `pick_ik`，适合 SO101 这类自由度不足以严格满足完整 6D 位姿约束的机械臂。
 
+MoveIt 中已经添加 arm 预设位姿：
+
+```text
+folded
+home
+ready
+pick_pre
+place_left
+place_right
+calib_front
+```
+
+其中 `home` 和 `folded` 都表示回到初始折叠位姿。
+
+这些预设位姿只是在 MoveIt 中作为目标状态使用。选择预设后，需要先 `Plan`，确认轨迹安全，再点击 `Execute` 才会控制真机。
+
 安装：
 
 ```bash
@@ -272,6 +288,70 @@ command_deadband_ticks:=4
 ```
 
 当前执行端属于初版位置控制。要进一步做到更快更稳，后续应使用 STS3215 舵机内部速度/加速度控制，或实现多舵机同步写入。
+
+## USB 相机
+
+安装 USB 相机驱动：
+
+```bash
+sudo apt install ros-humble-usb-cam
+```
+
+腕部 USB 相机相关代码放在 `so101_vision` 包中。`camera_link` 默认挂在 `follower/gripper_link` 下，TF 由 C++ 节点发布，同时会发布标准 ROS 光学坐标系 `camera_optical_frame`。
+
+启动腕部 USB 相机和 `camera_link`：
+
+```bash
+ros2 launch so101_vision so101_wrist_camera.launch.py \
+  video_device:=/dev/video0
+```
+
+默认图像话题：
+
+```text
+/camera/image_raw
+/camera/camera_info
+```
+
+查看图像：
+
+```bash
+ros2 run rqt_image_view rqt_image_view
+```
+
+查看相机 TF：
+
+```bash
+ros2 run tf2_ros tf2_echo follower/gripper_link camera_link
+```
+
+查看光学坐标系 TF：
+
+```bash
+ros2 run tf2_ros tf2_echo camera_link camera_optical_frame
+```
+
+图像消息的 `frame_id` 使用：
+
+```text
+camera_optical_frame
+```
+
+如果需要修改腕部相机的粗略外参：
+
+```bash
+ros2 launch so101_vision so101_wrist_camera.launch.py \
+  video_device:=/dev/video0 \
+  parent_frame:=follower/gripper_link \
+  camera_x:=-0.005 \
+  camera_y:=0.032 \
+  camera_z:=-0.020 \
+  camera_roll:=0.0 \
+  camera_pitch:=0.0 \
+  camera_yaw:=1.5708
+```
+
+这些外参只是初始估计。后续做手眼标定后，需要用标定结果替换 `camera_x/y/z/roll/pitch/yaw`。
 
 ## 安全注意事项
 

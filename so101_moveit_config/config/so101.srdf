@@ -16,6 +16,54 @@
     <joint name="wrist_roll" value="0.25"/>
   </group_state>
 
+  <group_state name="home" group="arm">
+    <joint name="shoulder_pan" value="0.0"/>
+    <joint name="shoulder_lift" value="-1.75"/>
+    <joint name="elbow_flex" value="1.58"/>
+    <joint name="wrist_flex" value="1.0"/>
+    <joint name="wrist_roll" value="0.25"/>
+  </group_state>
+
+  <group_state name="ready" group="arm">
+    <joint name="shoulder_pan" value="0.0"/>
+    <joint name="shoulder_lift" value="-0.90"/>
+    <joint name="elbow_flex" value="1.10"/>
+    <joint name="wrist_flex" value="0.45"/>
+    <joint name="wrist_roll" value="0.0"/>
+  </group_state>
+
+  <group_state name="pick_pre" group="arm">
+    <joint name="shoulder_pan" value="0.0"/>
+    <joint name="shoulder_lift" value="-0.55"/>
+    <joint name="elbow_flex" value="1.25"/>
+    <joint name="wrist_flex" value="0.85"/>
+    <joint name="wrist_roll" value="0.0"/>
+  </group_state>
+
+  <group_state name="place_left" group="arm">
+    <joint name="shoulder_pan" value="0.70"/>
+    <joint name="shoulder_lift" value="-0.65"/>
+    <joint name="elbow_flex" value="1.15"/>
+    <joint name="wrist_flex" value="0.75"/>
+    <joint name="wrist_roll" value="0.0"/>
+  </group_state>
+
+  <group_state name="place_right" group="arm">
+    <joint name="shoulder_pan" value="-0.70"/>
+    <joint name="shoulder_lift" value="-0.65"/>
+    <joint name="elbow_flex" value="1.15"/>
+    <joint name="wrist_flex" value="0.75"/>
+    <joint name="wrist_roll" value="0.0"/>
+  </group_state>
+
+  <group_state name="calib_front" group="arm">
+    <joint name="shoulder_pan" value="0.0"/>
+    <joint name="shoulder_lift" value="-0.75"/>
+    <joint name="elbow_flex" value="0.95"/>
+    <joint name="wrist_flex" value="0.20"/>
+    <joint name="wrist_roll" value="0.0"/>
+  </group_state>
+
   <group_state name="open" group="gripper">
     <joint name="gripper" value="1.0"/>
   </group_state>

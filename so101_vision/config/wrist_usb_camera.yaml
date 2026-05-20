@@ -1,0 +1,10 @@
+usb_cam:
+  ros__parameters:
+    video_device: "/dev/video0"
+    camera_name: "so101_wrist_camera"
+    frame_id: "camera_optical_frame"
+    framerate: 30.0
+    io_method: "mmap"
+    pixel_format: "mjpeg2rgb"
+    image_width: 640
+    image_height: 480
