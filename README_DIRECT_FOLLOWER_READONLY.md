@@ -1,18 +1,39 @@
 # SO101 从臂只读连接测试说明
 
-这份说明记录当前仓库为标准 SO101 从臂新增的“低风险只读连接测试”改动。该方案不依赖 `lerobot`，只直接读取 Feetech STS3215 舵机状态，用于验证从臂连接、发布关节状态，以及在 RViz 中显示模型姿态。
+这份说明记录当前仓库为标准 SO101 从臂新增的“低风险只读连接测试”改动。该方案不依赖 `lerobot`，直接读取 Feetech STS3215 舵机状态，用于验证从臂连接、发布关节状态，以及在 RViz 中显示模型姿态。
 
 当前版本不会向机械臂发送运动目标。
 
-## 改动内容
+## 当前默认实现
 
-新增只读测试节点：
+默认只读驱动已经迁移为 C++ 节点：
+
+```text
+so101_direct_driver/src/direct_follower_readonly_node.cpp
+```
+
+C++ 包：
+
+```text
+so101_direct_driver/
+```
+
+保留的 Python 对照版本：
 
 ```text
 so101_ros2_bridge/so101_ros2_bridge/direct_follower_readonly_node.py
 ```
 
-功能：
+当前 launch 默认启动 C++ 节点：
+
+```text
+package='so101_direct_driver'
+executable='direct_follower_readonly_node'
+```
+
+## 功能
+
+只读测试节点会完成：
 
 ```text
 打开从臂串口
@@ -33,7 +54,9 @@ so101_ros2_bridge/so101_ros2_bridge/direct_follower_readonly_node.py
 不依赖 lerobot
 ```
 
-新增只读测试配置：
+## 配置文件
+
+只读测试配置：
 
 ```text
 so101_ros2_bridge/config/so101_direct_follower_readonly.yaml
@@ -65,7 +88,9 @@ so101_ros2_bridge/config/so101_direct_follower_readonly.yaml
     zero_positions: [2076, 1957, 2056, 2241, 1920, 2050]
 ```
 
-新增只读测试 launch：
+## 启动文件
+
+只读测试 launch：
 
 ```text
 so101_bringup/launch/so101_readonly_test.launch.py
@@ -82,31 +107,6 @@ direct_follower_readonly_node
 
 不会启动 ROS2 control 的 controller manager 和控制器。
 
-修改 Python 包入口：
-
-```text
-so101_ros2_bridge/setup.py
-```
-
-新增入口：
-
-```python
-direct_follower_readonly_node = so101_ros2_bridge.direct_follower_readonly_node:main
-```
-
-修改依赖声明：
-
-```text
-so101_ros2_bridge/package.xml
-```
-
-新增：
-
-```xml
-<depend>sensor_msgs</depend>
-<exec_depend>python3-serial</exec_depend>
-```
-
 ## 编译
 
 在 ROS2 工作空间根目录执行：
@@ -115,12 +115,6 @@ so101_ros2_bridge/package.xml
 cd ~/so_101_ros2_ws
 colcon build --symlink-install
 source install/setup.bash
-```
-
-如果缺少串口 Python 包：
-
-```bash
-sudo apt install python3-serial
 ```
 
 ## 启动只读连接测试
@@ -168,7 +162,7 @@ ros2 topic echo /follower/joint_states
 
 ## 零位和方向参数
 
-只读节点把舵机原始位置转换成 ROS 关节角，核心参数是：
+核心参数：
 
 ```yaml
 signs: [1, 1, 1, 1, 1, 1]
@@ -217,13 +211,13 @@ ros2 launch so101_bringup so101_readonly_test.launch.py port:=/dev/ttyACM0 displ
 当前舵机原始位置：[2076, 816, 3086, 2893, 2083, 2050]
 ```
 
-4. 如果你希望这个真实姿态在 RViz 中显示为“所有关节角都是 0”，就直接把这 6 个数写入：
+4. 如果希望这个真实姿态在 RViz 中显示为“所有关节角都是 0”，就直接把这 6 个数写入：
 
 ```yaml
 zero_positions: [2076, 816, 3086, 2893, 2083, 2050]
 ```
 
-5. 如果你希望这个真实姿态对应仓库默认折叠姿态，需要按默认初始角度反算 `zero_positions`。
+5. 如果希望这个真实姿态对应仓库默认折叠姿态，需要按默认初始角度反算 `zero_positions`。
 
 仓库默认姿态来自：
 
@@ -248,31 +242,7 @@ gripper: 0.0
 zero_position = raw_position - target_angle / (2π) * 4096.0 / sign
 ```
 
-例如当前原始位置是：
-
-```text
-[2076, 816, 3086, 2893, 2083, 2050]
-```
-
-希望它对应默认折叠姿态，则当前配置为：
-
-```yaml
-zero_positions: [2076, 1957, 2056, 2241, 1920, 2050]
-```
-
-6. 修改配置后重新编译并 source：
-
-```bash
-cd ~/so_101_ros2_ws
-colcon build --symlink-install
-source install/setup.bash
-```
-
-7. 重新启动测试：
-
-```bash
-ros2 launch so101_bringup so101_readonly_test.launch.py port:=/dev/ttyACM0 display:=true
-```
+修改后重新编译、source 并启动。
 
 ## 如何修改方向
 
@@ -314,4 +284,31 @@ pkill -f rviz2
 
 当前只读测试节点不会让机械臂运动，因为它没有写入舵机目标位置，也没有接入 ROS2 controller。
 
-后续如果要加写入控制，应先做单关节、小角度、限位检查的安全测试，不要直接接完整轨迹控制。
+仓库中已经新增单关节小角度写入测试节点：
+
+```text
+so101_direct_driver/src/single_joint_write_test_node.cpp
+```
+
+默认只预演，不写入：
+
+```bash
+ros2 launch so101_bringup so101_single_joint_test.launch.py \
+  port:=/dev/ttyACM0 \
+  joint:=gripper \
+  delta_rad:=0.01 \
+  display:=true
+```
+
+确认安全后，显式打开写入：
+
+```bash
+ros2 launch so101_bringup so101_single_joint_test.launch.py \
+  port:=/dev/ttyACM0 \
+  joint:=gripper \
+  delta_rad:=0.01 \
+  enable_write:=true \
+  display:=true
+```
+
+不要直接跳到完整轨迹控制。应先确认单关节写入方向、幅度和限位都正确。

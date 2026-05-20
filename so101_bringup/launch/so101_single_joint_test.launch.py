@@ -9,14 +9,6 @@
 #
 # The above copyright notice and this permission notice shall be included in
 # all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
 
 
 import os
@@ -28,6 +20,7 @@ from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
@@ -39,23 +32,25 @@ def generate_launch_description():
         'display_config',
         default_value=os.path.join(bringup_pkg, 'rviz', 'robot_display_with_cameras.rviz'),
     )
-    display_arg = DeclareLaunchArgument(
-        'display', default_value='false', description='Launch RViz or not'
-    )
+    display_arg = DeclareLaunchArgument('display', default_value='false')
     model_arg = DeclareLaunchArgument(
         'model',
         default_value=os.path.join(description_pkg, 'urdf', 'so101_new_calib.urdf.xacro'),
     )
-    port_arg = DeclareLaunchArgument(
-        'port',
-        default_value='/dev/ttyACM0',
-        description='SO101 follower serial port',
-    )
+    port_arg = DeclareLaunchArgument('port', default_value='/dev/ttyACM0')
+    joint_arg = DeclareLaunchArgument('joint', default_value='gripper')
+    delta_rad_arg = DeclareLaunchArgument('delta_rad', default_value='0.01')
+    enable_write_arg = DeclareLaunchArgument('enable_write', default_value='false')
+    max_abs_delta_rad_arg = DeclareLaunchArgument('max_abs_delta_rad', default_value='0.05')
 
     model = LaunchConfiguration('model')
     display_config = LaunchConfiguration('display_config')
     display = LaunchConfiguration('display')
     port = LaunchConfiguration('port')
+    joint = LaunchConfiguration('joint')
+    delta_rad = LaunchConfiguration('delta_rad')
+    enable_write = LaunchConfiguration('enable_write')
+    max_abs_delta_rad = LaunchConfiguration('max_abs_delta_rad')
 
     follower_rsp = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(description_pkg, 'launch', 'rsp.launch.py')),
@@ -66,15 +61,21 @@ def generate_launch_description():
         }.items(),
     )
 
-    readonly_node = Node(
+    write_test_node = Node(
         package='so101_direct_driver',
-        executable='direct_follower_readonly_node',
-        name='so101_direct_follower_readonly',
+        executable='single_joint_write_test_node',
+        name='so101_single_joint_write_test',
         namespace='follower',
         output='screen',
         parameters=[
             os.path.join(bridge_pkg, 'config', 'so101_direct_follower_readonly.yaml'),
-            {'port': port},
+            {
+                'port': port,
+                'joint': joint,
+                'delta_rad': ParameterValue(delta_rad, value_type=float),
+                'enable_write': ParameterValue(enable_write, value_type=bool),
+                'max_abs_delta_rad': ParameterValue(max_abs_delta_rad, value_type=float),
+            },
         ],
     )
 
@@ -96,8 +97,12 @@ def generate_launch_description():
             display_arg,
             model_arg,
             port_arg,
+            joint_arg,
+            delta_rad_arg,
+            enable_write_arg,
+            max_abs_delta_rad_arg,
             follower_rsp,
-            readonly_node,
+            write_test_node,
             delayed_display,
         ]
     )

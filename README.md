@@ -1,141 +1,52 @@
-<div align="center">
-  <h1>so101_ros2</h1>
-  <p>SO101 follower arm ROS2 read-only integration without lerobot.</p>
-  <p>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
-    <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python Version"></a>
-    <a href="https://docs.ros.org/en/humble/Installation.html"><img src="https://img.shields.io/badge/ROS2-Humble-green.svg" alt="ROS2 Version"></a>
-  </p>
-</div>
+# so101_ros2
 
----
+SO101 从臂 ROS2 工程。当前版本面向标准 SO101 follower arm，使用 Feetech STS3215 舵机，重点实现不依赖 `lerobot` 的 ROS2 连接、RViz 同步和 MoveIt 规划执行。
 
-## 项目状态
+当前代码以 C++ 驱动为主，launch 文件使用 Python。
 
-本仓库当前用于标准 SO101 从臂的 ROS2 只读连接测试。
+## 当前已完成功能
 
-已经完成：
+- 不依赖 `lerobot`，可以直接通过串口连接 SO101 从臂。
+- C++ 只读节点可以检测 1-6 号舵机并读取当前位置。
+- 发布 `/follower/joint_states`，RViz 中的模型可以和真实机械臂同步。
+- 支持单关节低风险写入测试。
+- 已创建 `so101_moveit_config`，可以在 MoveIt 中规划。
+- 已实现 `FollowJointTrajectory` action server，MoveIt 的 `Execute` 可以发送轨迹到真机。
+- 支持执行端速度限制、插值执行和基础抖动过滤参数。
 
-```text
-不依赖 lerobot
-直接连接 SO101 从臂 Feetech STS3215 舵机
-检测 1-6 号舵机是否在线
-读取每个舵机当前位置
-发布 ROS2 joint_states
-在 RViz 中显示机械臂模型
-支持零位和方向配置
-中文测试日志
-```
+## 硬件假设
 
-当前节点是低风险只读测试节点，不会向机械臂发送运动命令。
+- 机械臂：标准 SO101 从臂
+- 舵机：Feetech STS3215
+- 舵机 ID：默认 1-6
+- 串口示例：`/dev/ttyACM0`
+- ROS2：Humble
 
----
-
-## 已完成的功能
-
-### 1. 不依赖 lerobot
-
-新增节点直接通过串口与 SO101 从臂舵机通信，不需要安装或导入 `lerobot`。
-
-节点文件：
+关节顺序固定为：
 
 ```text
-so101_ros2_bridge/so101_ros2_bridge/direct_follower_readonly_node.py
+shoulder_pan
+shoulder_lift
+elbow_flex
+wrist_flex
+wrist_roll
+gripper
 ```
 
-### 2. ROS2 关节状态发布
-
-节点会发布：
+## 主要新增内容
 
 ```text
-/follower/joint_states
-/follower/joint_states_raw
-```
-
-查看一次关节状态：
-
-```bash
-ros2 topic echo /follower/joint_states --once
-```
-
-连续查看：
-
-```bash
-ros2 topic echo /follower/joint_states
-```
-
-### 3. RViz 模型显示
-
-启动只读测试时可以打开 RViz。RViz 中的 SO101 模型会根据 `/follower/joint_states` 更新姿态。
-
----
-
-## 当前不会做的事情
-
-当前版本不会控制机械臂运动。
-
-不会执行：
-
-```text
-不发送舵机目标位置
-不订阅 /follower/joint_commands
-不启动 arm_controller
-不启动 gripper_controller
-不执行轨迹控制
-不执行遥操作
-```
-
----
-
-## 主要新增文件
-
-只读测试节点：
-
-```text
-so101_ros2_bridge/so101_ros2_bridge/direct_follower_readonly_node.py
-```
-
-只读测试配置：
-
-```text
-so101_ros2_bridge/config/so101_direct_follower_readonly.yaml
-```
-
-只读测试启动文件：
-
-```text
+so101_direct_driver/
+so101_moveit_config/
+RVIZ_REAL_ARM_SYNC.md
+README_DIRECT_FOLLOWER_READONLY.md
 so101_bringup/launch/so101_readonly_test.launch.py
+so101_bringup/launch/so101_single_joint_test.launch.py
+so101_bringup/launch/so101_moveit_trajectory_check.launch.py
+so101_bringup/launch/so101_trajectory_action_server.launch.py
 ```
-
-Python 入口已添加到：
-
-```text
-so101_ros2_bridge/setup.py
-```
-
-依赖声明已添加到：
-
-```text
-so101_ros2_bridge/package.xml
-```
-
----
-
-## 依赖
-
-需要 ROS2 Humble。
-
-需要串口 Python 包：
-
-```bash
-sudo apt install python3-serial
-```
-
----
 
 ## 编译
-
-在 ROS2 工作空间根目录执行：
 
 ```bash
 cd ~/so_101_ros2_ws
@@ -143,45 +54,70 @@ colcon build --symlink-install
 source install/setup.bash
 ```
 
----
-
-## 启动只读连接测试
-
-不启动 RViz：
+如果串口没有权限：
 
 ```bash
-ros2 launch so101_bringup so101_readonly_test.launch.py port:=/dev/ttyACM0 display:=false
+sudo usermod -aG dialout $USER
 ```
 
-启动 RViz：
+然后注销重新登录，或临时执行：
 
 ```bash
-ros2 launch so101_bringup so101_readonly_test.launch.py port:=/dev/ttyACM0 display:=true
+sudo chmod 666 /dev/ttyACM0
 ```
 
-根据实际情况修改串口：
+## 只读连接测试
+
+这个节点只读舵机位置，不会发送运动目标，适合第一次连接测试。
+
+不打开 RViz：
+
+```bash
+ros2 launch so101_bringup so101_readonly_test.launch.py \
+  port:=/dev/ttyACM0 \
+  display:=false
+```
+
+打开 RViz：
+
+```bash
+ros2 launch so101_bringup so101_readonly_test.launch.py \
+  port:=/dev/ttyACM0 \
+  display:=true
+```
+
+查看关节状态：
+
+```bash
+ros2 topic echo /follower/joint_states --once
+```
+
+查看原始舵机位置：
+
+```bash
+ros2 topic echo /follower/joint_states_raw --once
+```
+
+## RViz 和真实机械臂同步原理
+
+同步链路是：
 
 ```text
-/dev/ttyACM0
-/dev/ttyACM1
+STS3215 舵机原始位置
+  -> so101_direct_driver C++ 节点
+  -> /follower/joint_states
+  -> robot_state_publisher
+  -> /tf
+  -> RViz RobotModel
 ```
 
-正常连接时会看到类似日志：
+我们不需要自己手写 TF。动态 TF 由 `robot_state_publisher` 根据 URDF 和 `/follower/joint_states` 自动发布。
+
+详细说明见：
 
 ```text
-准备打开从臂串口：/dev/ttyACM0，波特率：1000000。
-串口已打开，开始检测 1-6 号舵机。
-shoulder_pan：检测到 1 号舵机。
-shoulder_lift：检测到 2 号舵机。
-elbow_flex：检测到 3 号舵机。
-wrist_flex：检测到 4 号舵机。
-wrist_roll：检测到 5 号舵机。
-gripper：检测到 6 号舵机。
-所有舵机均已响应。
-只读连接测试节点已启动。该节点不会发送运动目标。
+RVIZ_REAL_ARM_SYNC.md
 ```
-
----
 
 ## 零位和方向配置
 
@@ -194,28 +130,11 @@ so101_ros2_bridge/config/so101_direct_follower_readonly.yaml
 核心参数：
 
 ```yaml
-signs: [1, 1, 1, 1, 1, 1]
+motor_ids: [1, 2, 3, 4, 5, 6]
 zero_positions: [2076, 1957, 2056, 2241, 1920, 2050]
-```
-
-关节顺序：
-
-```text
-shoulder_pan
-shoulder_lift
-elbow_flex
-wrist_flex
-wrist_roll
-gripper
-```
-
-`zero_positions` 表示 ROS 关节角为 0 时对应的舵机原始位置。
-
-`signs` 表示方向：
-
-```text
-1  表示同向
--1 表示反向
+signs: [1, 1, 1, 1, 1, 1]
+range_mins: [851, 811, 887, 987, 0, 2025]
+range_maxs: [3438, 3215, 3090, 3219, 4095, 3493]
 ```
 
 换算公式：
@@ -224,126 +143,163 @@ gripper
 ros_angle = sign * (raw_position - zero_position) / 4096.0 * 2π
 ```
 
----
+如果 RViz 方向和真实机械臂方向相反，修改对应关节的 `signs`。
 
-## 修改零位
+如果 RViz 初始位姿和真实机械臂不一致，修改 `zero_positions`。
 
-1. 将真实机械臂摆到参考姿态。
+## 单关节低风险写入测试
 
-2. 启动只读测试：
+第一次写入真机前，建议先测试单个关节的小幅运动。
 
-```bash
-ros2 launch so101_bringup so101_readonly_test.launch.py port:=/dev/ttyACM0 display:=false
-```
-
-3. 查看日志中的舵机原始位置：
-
-```text
-当前舵机原始位置：[2076, 816, 3086, 2893, 2083, 2050]
-```
-
-4. 如果希望当前真实姿态对应 RViz 的关节零位，直接写入：
-
-```yaml
-zero_positions: [2076, 816, 3086, 2893, 2083, 2050]
-```
-
-5. 如果希望当前真实姿态对应仓库默认折叠姿态，需要根据目标角度反算 `zero_positions`。
-
-默认折叠姿态文件：
-
-```text
-so101_description/config/initial_positions.yaml
-```
-
-默认角度：
-
-```yaml
-shoulder_pan: 0.0
-shoulder_lift: -1.75
-elbow_flex: 1.58
-wrist_flex: 1.0
-wrist_roll: 0.25
-gripper: 0.0
-```
-
-反算公式：
-
-```text
-zero_position = raw_position - target_angle / (2π) * 4096.0 / sign
-```
-
-修改后重新编译并 source：
+示例：测试夹爪：
 
 ```bash
-cd ~/so_101_ros2_ws
-colcon build --symlink-install
-source install/setup.bash
+ros2 launch so101_bringup so101_single_joint_test.launch.py \
+  port:=/dev/ttyACM0 \
+  joint:=gripper \
+  delta_rad:=0.02 \
+  enable_write:=true \
+  display:=false
 ```
 
----
+示例：测试腕部旋转：
 
-## 修改方向
-
-如果真实机械臂某个关节往一个方向动，但 RViz 中该关节往反方向动，修改对应的 `signs`。
-
-例如 `elbow_flex` 是第 3 个关节，如果它方向反了：
-
-```yaml
-signs: [1, 1, -1, 1, 1, 1]
+```bash
+ros2 launch so101_bringup so101_single_joint_test.launch.py \
+  port:=/dev/ttyACM0 \
+  joint:=wrist_roll \
+  delta_rad:=0.05 \
+  enable_write:=true \
+  display:=false
 ```
 
----
+参数说明：
 
-## 常见问题
+```text
+joint          要测试的关节名
+delta_rad      相对当前位置变化量，单位 rad
+enable_write   true 才会真正写入舵机
+```
 
-### RViz 模型在两个姿态之间快速切换
+## MoveIt 规划
 
-通常是 `/follower/joint_states` 有多个发布者。
+只启动 MoveIt，用于规划和 RViz 交互：
 
-检查：
+```bash
+ros2 launch so101_moveit_config moveit_planning.launch.py
+```
+
+连接真实机械臂状态：
+
+```bash
+ros2 launch so101_moveit_config moveit_planning.launch.py \
+  use_fake_joint_states:=false \
+  joint_states_topic:=/follower/joint_states
+```
+
+当前 IK 使用 `pick_ik`，适合 SO101 这类自由度不足以严格满足完整 6D 位姿约束的机械臂。
+
+安装：
+
+```bash
+sudo apt update
+sudo apt install ros-humble-pick-ik
+```
+
+## MoveIt 真机执行
+
+真机执行需要两个终端。
+
+终端 1，启动 C++ 轨迹执行 action server：
+
+```bash
+ros2 launch so101_bringup so101_trajectory_action_server.launch.py \
+  port:=/dev/ttyACM0 \
+  time_scale:=1.0 \
+  max_velocity_rad_s:=0.06 \
+  max_step_rad:=0.01 \
+  command_rate:=15.0 \
+  command_deadband_ticks:=3
+```
+
+终端 2，启动 MoveIt：
+
+```bash
+ros2 launch so101_moveit_config moveit_planning.launch.py \
+  use_fake_joint_states:=false \
+  joint_states_topic:=/follower/joint_states \
+  allow_execute:=true
+```
+
+确认 action server 存在：
+
+```bash
+ros2 action list | grep follow_joint_trajectory
+```
+
+应该看到：
+
+```text
+/follower_arm_controller/follow_joint_trajectory
+```
+
+## 真机执行参数
+
+```text
+max_velocity_rad_s       最大关节速度，越小越慢
+max_step_rad             插值最大步长，越小越细
+command_rate             轨迹执行时目标发送频率
+command_deadband_ticks   目标 raw tick 死区，过滤很小的重复写入
+time_scale               对 MoveIt 轨迹时间做整体缩放
+```
+
+推荐稳定测试参数：
+
+```bash
+max_velocity_rad_s:=0.06
+max_step_rad:=0.01
+command_rate:=15.0
+command_deadband_ticks:=3
+```
+
+如果仍然抖动，可以更保守：
+
+```bash
+max_velocity_rad_s:=0.04
+max_step_rad:=0.01
+command_rate:=10.0
+command_deadband_ticks:=4
+```
+
+当前执行端属于初版位置控制。要进一步做到更快更稳，后续应使用 STS3215 舵机内部速度/加速度控制，或实现多舵机同步写入。
+
+## 安全注意事项
+
+- 第一次测试必须低速、小幅度。
+- 真机执行前，手和线缆离开机械臂运动范围。
+- 不要同时启动 `so101_readonly_test.launch.py` 和 `so101_trajectory_action_server.launch.py`，它们会抢同一个串口。
+- 如果 Execute 失败，先看 action server 终端日志。
+- 如果 RViz 模型来回跳，检查 `/follower/joint_states` 是否有多个发布者：
 
 ```bash
 ros2 topic info /follower/joint_states -v
 ```
 
-正常只读测试应为：
+## 当前限制
 
-```text
-Publisher count: 1
-```
-
-如果有多个发布者，清理旧进程：
-
-```bash
-pkill -f direct_follower_readonly_node
-pkill -f robot_state_publisher
-pkill -f rviz2
-```
-
-然后重新启动。
-
-### 串口打不开
-
-检查串口和权限：
-
-```bash
-ls /dev/ttyACM*
-sudo chmod 666 /dev/ttyACM0
-```
-
-如果在虚拟机中使用真机，还需要确认 USB 已直通到虚拟机。
-
----
+- MoveIt 真机执行已经可用，但轨迹平滑性仍受串口写入方式和舵机内部控制影响。
+- 当前 action server 主要控制 5 个 arm 关节，夹爪 MoveIt 控制后续再完善。
+- 暂未实现 STS3215 内部速度寄存器控制。
+- 暂未实现多舵机同步写入。
 
 ## 后续计划
 
-当前只完成只读连接、状态发布和 RViz 显示。
-
-后续如果要实现运动控制，应先增加单关节、小角度、带限位检查的安全写入测试，再接入完整 ROS2 controller。
-
----
+- 添加夹爪 MoveIt 控制。
+- 添加常用预设位姿，例如 `home`、`ready`、`folded`。
+- 使用 STS3215 内部速度参数改善执行平滑度。
+- 实现多舵机同步写入。
+- 增加手眼标定辅助节点。
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for the full license text.
+MIT License.

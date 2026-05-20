@@ -9,6 +9,9 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <exec_depend>so101_description</exec_depend>
+  <exec_depend>so101_direct_driver</exec_depend>
+  <exec_depend>so101_ros2_bridge</exec_depend>
   <exec_depend>usb_cam</exec_depend>
   <exec_depend>realsense2_camera</exec_depend>
   <!-- (Optional) if you use the RS URDF/meshes -->

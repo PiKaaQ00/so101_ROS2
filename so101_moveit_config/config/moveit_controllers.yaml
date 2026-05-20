@@ -1,0 +1,16 @@
+moveit_simple_controller_manager:
+  controller_names:
+    - follower_arm_controller
+
+  follower_arm_controller:
+    type: FollowJointTrajectory
+    action_ns: follow_joint_trajectory
+    default: true
+    joints:
+      - shoulder_pan
+      - shoulder_lift
+      - elbow_flex
+      - wrist_flex
+      - wrist_roll
+
+moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControllerManager
